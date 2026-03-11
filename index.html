@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Artset Tracker">
+<meta name="theme-color" content="#0d0d12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokémon Artset Tracker</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap');
+  :root {
+    --bg: #0d0d12; --surface: #16161e; --surface2: #1e1e2a;
+    --border: #2a2a38; --text: #e8e8f0; --muted: #6b6b80; --accent: #c8b4ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+  header {
+    padding: 18px 28px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    position: sticky; top: 0; background: rgba(13,13,18,0.95); backdrop-filter: blur(12px);
+    z-index: 100; flex-wrap: wrap;
+  }
+  .logo { font-family: 'Unbounded', sans-serif; font-size: 1rem; font-weight: 800; white-space: nowrap; }
+  .logo span { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .header-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat-pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 999px; padding: 5px 14px; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+  .stat-pill strong { color: var(--accent); font-family: 'Unbounded', sans-serif; font-size: 0.8rem; }
+
+  /* LANG SWITCH */
+  .lang-switch {
+    display: flex; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 999px; overflow: hidden; flex-shrink: 0;
+  }
+  .lang-btn {
+    padding: 5px 14px; font-size: 0.72rem; font-family: 'Unbounded', sans-serif;
+    font-weight: 600; letter-spacing: 0.05em; cursor: pointer;
+    border: none; background: transparent; color: var(--muted);
+    transition: background 0.2s, color 0.2s;
+  }
+  .lang-btn.active { background: var(--accent); color: #000; }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 28px 20px 80px; }
+  .serie-section { margin-bottom: 36px; }
+  .serie-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; cursor: pointer; user-select: none; }
+  .serie-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .serie-title { font-family: 'Unbounded', sans-serif; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); flex: 1; }
+  .serie-progress-bar { flex: 1; max-width: 160px; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .serie-progress-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+  .serie-count { font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+  .serie-toggle { font-size: 0.65rem; color: var(--muted); transition: transform 0.2s; }
+  .serie-section.collapsed .serie-toggle { transform: rotate(-90deg); }
+  .expansions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; transition: max-height 0.35s ease, opacity 0.3s ease; overflow: hidden; }
+  .serie-section.collapsed .expansions-grid { max-height: 0 !important; opacity: 0; pointer-events: none; }
+
+  /* CARD */
+  .exp-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+    transition: border-color 0.2s, transform 0.15s;
+    position: relative; overflow: hidden;
+  }
+  .exp-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--card-color, var(--accent)); opacity: 0.4; transition: opacity 0.2s; }
+  .exp-card:hover { border-color: color-mix(in srgb, var(--card-color, var(--accent)) 35%, transparent); transform: translateY(-1px); }
+  .exp-card:hover::before { opacity: 1; }
+  .exp-card.complete::before { opacity: 1; }
+
+  .exp-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .exp-date { font-size: 0.62rem; color: var(--muted); font-style: italic; white-space: nowrap; }
+  .complete-badge { font-size: 0.52rem; font-family: 'Unbounded', sans-serif; letter-spacing: 0.06em; background: var(--card-color, var(--accent)); color: #000; border-radius: 4px; padding: 2px 6px; font-weight: 700; opacity: 0; transform: scale(0.8); transition: opacity 0.2s, transform 0.2s; white-space: nowrap; flex-shrink: 0; }
+  .exp-card.complete .complete-badge { opacity: 1; transform: scale(1); }
+
+  .exp-name { font-size: 0.8rem; font-weight: 500; line-height: 1.3; }
+
+  .bustine-list { display: flex; flex-direction: column; gap: 5px; }
+  .bustina-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: var(--surface2); border: 1px solid var(--border); cursor: pointer; transition: border-color 0.15s, background 0.15s; user-select: none; }
+  .bustina-row:hover { border-color: color-mix(in srgb, var(--card-color, var(--accent)) 40%, transparent); }
+  .bustina-row.owned { background: color-mix(in srgb, var(--card-color, var(--accent)) 12%, var(--surface2)); border-color: color-mix(in srgb, var(--card-color, var(--accent)) 40%, transparent); }
+  .bustina-check { width: 16px; height: 16px; border-radius: 4px; flex-shrink: 0; border: 1.5px solid var(--border); background: transparent; transition: background 0.15s, border-color 0.15s; display: flex; align-items: center; justify-content: center; }
+  .bustina-row.owned .bustina-check { background: var(--card-color, var(--accent)); border-color: var(--card-color, var(--accent)); }
+  .bustina-check svg { display: none; }
+  .bustina-row.owned .bustina-check svg { display: block; }
+  .bustina-name { font-size: 0.75rem; color: var(--text); flex: 1; line-height: 1.2; }
+  .bustina-row.owned .bustina-name { color: color-mix(in srgb, var(--card-color, var(--accent)) 80%, var(--text)); }
+
+  .artset-fraction { font-family: 'Unbounded', sans-serif; font-size: 0.65rem; color: var(--muted); text-align: right; }
+  .artset-fraction.complete { color: var(--card-color, var(--accent)); }
+
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 18px; font-size: 0.8rem; color: var(--text); z-index: 9999; transition: transform 0.3s ease; pointer-events: none; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  @media (max-width: 600px) { .expansions-grid { grid-template-columns: 1fr 1fr; } .exp-name { font-size: 0.74rem; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Pokémon <span>Artset</span> Tracker</div>
+  <div class="header-right">
+    <div class="header-stats">
+      <div class="stat-pill">Bustine <strong id="stat-owned">0</strong> / <strong id="stat-total">0</strong></div>
+      <div class="stat-pill">Set completi <strong id="stat-complete">0</strong></div>
+    </div>
+    <div class="lang-switch">
+      <button class="lang-btn active" id="btn-it" onclick="setLang('it')">IT</button>
+      <button class="lang-btn" id="btn-en" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+</header>
+<main id="app"></main>
+<div id="toast"></div>
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATI — ogni espansione ha: id, nameIT, nameEN, date (YYYY-MM-DD), artset[]
+// Per le serie vecchie senza artset noti: ['Da aggiungere']
+// ═══════════════════════════════════════════════════════════════
+const SERIES = [
+  {
+    id: 'mega', labelIT: 'Serie Mega', labelEN: 'Scarlet & Violet — Mega', color: '#ff6b35',
+    expansions: [
+      { id: 'mega-ep',  nameIT: 'Equilibrio Perfetto', nameEN: 'Destined Rivals',   date: '2026-03-27', artset: ['Dragonite','Lucario','Charizard','Pikachu'] },
+      { id: 'mega-ae',  nameIT: 'Ascesa Eroica',        nameEN: 'Ascended Heroes',   date: '2026-01-30', artset: ['Da aggiungere'] },
+      { id: 'mega-fs',  nameIT: 'Fiamme Spettrali',     nameEN: 'Phantasmal Flames', date: '2025-11-14', artset: ['Charizard','Gengar','Heracross','Lopunny'] },
+      { id: 'mega-meg', nameIT: 'Megaevoluzione',        nameEN: 'Mega Evolution',    date: '2025-09-26', artset: ['Gardevoir','Kangaskhan','Lucario','Venusaur'] },
+    ]
+  },
+  {
+    id: 'sv', labelIT: 'Scarlatto e Violetto', labelEN: 'Scarlet & Violet', color: '#c84b9e',
+    expansions: [
+      { id: 'sv-ln',    nameIT: 'Luce Nera',              nameEN: 'Black Bolt',             date: '2025-07-18', artset: ['Zekrom'] },
+      { id: 'sv-fb',    nameIT: 'Fuoco Bianco',            nameEN: 'White Flare',            date: '2025-07-18', artset: ['Reshiram'] },
+      { id: 'sv-rp',    nameIT: 'Rivali Predestinati',     nameEN: 'Destined Rivals',        date: '2025-05-30', artset: ['Cynthia / Garchomp','Ethan / Ho-Oh','Giovanni / Mewtwo','Ariana / Team Rocket'] },
+      { id: 'sv-ai',    nameIT: 'Avventure Insieme',       nameEN: 'Journey Together',       date: '2025-03-28', artset: ['Zacian / Hop','Bellibolt / Iono','Clefairy / Lillie','Zoroark / N'] },
+      { id: 'sv-ep2',   nameIT: 'Evoluzioni Prismatiche',  nameEN: 'Prismatic Evolutions',   date: '2025-01-17', artset: ['Vaporeon / Jolteon / Flareon','Eevee / Sylveon','Espeon / Umbreon','Leafeon / Glaceon'] },
+      { id: 'sv-sfol',  nameIT: 'Scintille Folgoranti',    nameEN: 'Surging Sparks',         date: '2024-11-08', artset: ['Pikachu','Latias','Archaludon','Exeggutor'] },
+      { id: 'sv-ca',    nameIT: 'Corona Astrale',          nameEN: 'Stellar Crown',          date: '2024-09-12', artset: ['Terapagos','Lapras','Galvantula','Cinderace'] },
+      { id: 'sv-sf',    nameIT: 'Segreto Fiabesco',        nameEN: 'Shrouded Fable',         date: '2024-08-02', artset: ['Okidogi','Munkidori','Fezandipiti','Pecharunt'] },
+      { id: 'sv-cm',    nameIT: 'Crepuscolo Mascherato',   nameEN: 'Twilight Masquerade',    date: '2024-05-24', artset: ['Sinistcha','Ogerpon','Dragapult','Ursaluna'] },
+      { id: 'sv-cf',    nameIT: 'Cronoforze',              nameEN: 'Temporal Forces',        date: '2024-03-22', artset: ['Walking Wake','Raging Bolt','Iron Leaves','Iron Crown'] },
+      { id: 'sv-ddp',   nameIT: 'Destino di Paldea',       nameEN: 'Paldean Fates',          date: '2024-01-26', artset: ['Tinkaton','Pikachu','Dondozo','Ceruledge'] },
+      { id: 'sv-pt',    nameIT: 'Paradosso Temporale',     nameEN: 'Paradox Rift',           date: '2023-11-03', artset: ['Garchomp','Iron Valiant','Armarouge','Roaring Moon'] },
+      { id: 'sv-151',   nameIT: 'Pokémon 151',             nameEN: 'Pokémon 151',            date: '2023-09-22', artset: ['Mew'] },
+      { id: 'sv-oi',    nameIT: 'Ossidiana Infuocata',     nameEN: 'Obsidian Flames',        date: '2023-08-11', artset: ['Revavroom','Tyranitar','Charizard','Dragonite'] },
+      { id: 'sv-eap',   nameIT: 'Evoluzioni a Paldea',     nameEN: 'Paldea Evolved',         date: '2023-06-09', artset: ['Ting-Lu','Quaquaval','Meowscarada','Chien-Pao','Skeledirge'] },
+      { id: 'sv-base',  nameIT: 'Scarlatto e Violetto',    nameEN: 'Scarlet & Violet',       date: '2023-03-31', artset: ['Quaxly / Fuecoco / Sprigatito','Miraidon','Gyarados','Koraidon'] },
+    ]
+  },
+  {
+    id: 'ss', labelIT: 'Spada e Scudo', labelEN: 'Sword & Shield', color: '#4b8ec8',
+    expansions: [
+      { id: 'ss-zr',   nameIT: 'Zenit Regale',           nameEN: 'Crown Zenith',          date: '2023-01-20', artset: ['Zacian / Zamazenta'] },
+      { id: 'ss-ta',   nameIT: 'Tempesta Argentata',      nameEN: 'Silver Tempest',        date: '2022-11-11', artset: ['Regidrago','Regieleki','Lugia','Vulpix'] },
+      { id: 'ss-op',   nameIT: 'Origine Perduta',         nameEN: 'Lost Origin',           date: '2022-09-09', artset: ['Zoroark','Giratina','Gardevoir','Enamorus'] },
+      { id: 'ss-pgo',  nameIT: 'Pokémon GO',              nameEN: 'Pokémon GO',            date: '2022-07-01', artset: ['Mewtwo / Gyarados / Aipom / Blissey / Conkeldurr / Larvitar / Pikachu'] },
+      { id: 'ss-ls',   nameIT: 'Lucentezza Siderale',     nameEN: 'Astral Radiance',       date: '2022-05-27', artset: ['Typhlosion','Decidueye','Dialga','Samurott','Palkia'] },
+      { id: 'ss-al',   nameIT: 'Astri Lucenti',           nameEN: 'Brilliant Stars',       date: '2022-02-25', artset: ['Whimsicott','Shaymin','Charizard','Arceus'] },
+      { id: 'ss-cf2',  nameIT: 'Colpo Fusione',           nameEN: 'Fusion Strike',         date: '2021-11-12', artset: ['Boltund','Genesect','Mew','Gengar'] },
+      { id: 'ss-gf',   nameIT: 'Gran Festa',              nameEN: 'Celebrations',          date: '2021-10-08', artset: ['Pikachu / tutti gli starter'] },
+      { id: 'ss-ee',   nameIT: 'Evoluzioni Eteree',       nameEN: 'Evolving Skies',        date: '2021-08-27', artset: ['Duraludon','Sylveon','Rayquaza','Umbreon'] },
+      { id: 'ss-rg',   nameIT: 'Regno Glaciale',          nameEN: 'Chilling Reign',        date: '2021-06-18', artset: ['Moltres','Zapdos','Articuno','Ice Rider Calyrex','Shadow Rider Calyrex'] },
+      { id: 'ss-sdl',  nameIT: 'Stili di Lotta',          nameEN: 'Battle Styles',         date: '2021-03-19', artset: ['Urshifu (Pugno Singolo)','Urshifu (Colpo Rapido)','Tyranitar','Empoleon'] },
+      { id: 'ss-ds',   nameIT: 'Destino Splendente',      nameEN: 'Shining Fates',         date: '2021-02-19', artset: ['Dragapult','Toxtricity','Corviknight','Charizard'] },
+      { id: 'ss-vs',   nameIT: 'Voltaggio Sfolgorante',   nameEN: 'Vivid Voltage',         date: '2020-11-13', artset: ['Zarude','Orbeetle','Pikachu','Celebi'] },
+      { id: 'ss-fc',   nameIT: 'Futuri Campioni',         nameEN: "Champion's Path",       date: '2020-09-25', artset: ['Obstagoon','Gardevoir','Drednaw','Alcremie'] },
+      { id: 'ss-fo',   nameIT: 'Fiamme Oscure',           nameEN: 'Darkness Ablaze',       date: '2020-08-14', artset: ['Eternatus','Grimmsnarl','Centiskorch','Charizard'] },
+      { id: 'ss-fr',   nameIT: 'Fragore Ribelle',         nameEN: 'Rebel Clash',           date: '2020-05-01', artset: ['Toxtricity','Cinderace','Inteleon','Rillaboom'] },
+      { id: 'ss-base', nameIT: 'Spada e Scudo',           nameEN: 'Sword & Shield',        date: '2020-02-07', artset: ['Snorlax','Lapras','Zamazenta','Zacian'] },
+    ]
+  },
+  {
+    id: 'sm', labelIT: 'Sole e Luna', labelEN: 'Sun & Moon', color: '#27ae60',
+    expansions: [
+      { id: 'sm-ec',    nameIT: 'Eclissi Cosmica',        nameEN: 'Cosmic Eclipse',        date: '2019-11-01', artset: ['Cleffa / Igglybuff / Togepi','Solgaleo / Lunala','Piplup / Blastoise','Arceus / Dialga / Palkia'] },
+      { id: 'sm-dsf',   nameIT: 'Destino Sfuggente',      nameEN: 'Hidden Fates',          date: '2019-08-23', artset: ['Mew','Articuno / Moltres / Zapdos','Mewtwo','Charizard'] },
+      { id: 'sm-smt',   nameIT: 'Sintonia Mentale',       nameEN: 'Unified Minds',         date: '2019-08-02', artset: ['Giratina / Garchomp','Solgaleo / Lunala','Espeon / Deoxys','Mewtwo / Mew'] },
+      { id: 'sm-lgi',   nameIT: 'Legami Inossidabili',    nameEN: 'Unbroken Bonds',        date: '2019-05-03', artset: ['Marshadow / Machamp','Reshiram / Charizard','Gardevoir / Sylveon','Meltan / Lucario'] },
+      { id: 'sm-dp',    nameIT: 'Detective Pikachu',      nameEN: 'Detective Pikachu',     date: '2019-04-05', artset: ['Pokéball (artwork unico)'] },
+      { id: 'sm-gs',    nameIT: 'Gioco di Squadra',       nameEN: 'Team Up',               date: '2019-02-01', artset: ['Eevee / Snorlax','Gengar / Mimikyu','Pikachu / Zekrom','Venusaur / Celebi'] },
+      { id: 'sm-tup',   nameIT: 'Tuoni Perduti',          nameEN: 'Lost Thunder',          date: '2018-11-02', artset: ['Celebi','Blacephalon','Zeraora','Lugia'] },
+      { id: 'sm-td',    nameIT: 'Trionfo dei Draghi',     nameEN: 'Dragon Majesty',        date: '2018-09-07', artset: ['Charizard','Dragonite','Reshiram','Salamence'] },
+      { id: 'sm-tas',   nameIT: 'Tempesta Astrale',       nameEN: 'Celestial Storm',       date: '2018-08-03', artset: ['Stakataka','Jirachi','Rayquaza','Blaziken'] },
+      { id: 'sm-adl',   nameIT: 'Apocalisse di Luce',     nameEN: 'Forbidden Light',       date: '2018-05-04', artset: ['Naganadel','Necrozma','Greninja','Zygarde'] },
+      { id: 'sm-up',    nameIT: 'Ultraprisma',            nameEN: 'Ultra Prism',           date: '2018-02-02', artset: ['Giratina','Leafeon','Necrozma (Alba)','Necrozma (Crepuscolo)'] },
+      { id: 'sm-is',    nameIT: 'Invasione Scarlatta',    nameEN: 'Crimson Invasion',      date: '2017-11-03', artset: ['Guzzlord','Kartana','Buzzwole','Silvally'] },
+      { id: 'sm-li',    nameIT: 'Leggende Iridescenti',   nameEN: 'Shining Legends',       date: '2017-10-06', artset: ['Genesect','Mewtwo','Mew','Rayquaza'] },
+      { id: 'sm-oi',    nameIT: 'Ombre Infuocate',        nameEN: 'Burning Shadows',       date: '2017-08-04', artset: ['Marshadow','Tapu Fini','Necrozma','Ho-Oh'] },
+      { id: 'sm-gn',    nameIT: 'Guardiani Nascenti',     nameEN: 'Guardians Rising',      date: '2017-05-05', artset: ['Ninetales','Tapu Koko','Lycanroc','Kommo-o'] },
+      { id: 'sm-base',  nameIT: 'Sole e Luna',            nameEN: 'Sun & Moon',            date: '2017-02-03', artset: ['Solgaleo','Lunala','Incineroar','Decidueye','Primarina'] },
+    ]
+  },
+  {
+    id: 'xy', labelIT: 'Serie XY', labelEN: 'XY Series', color: '#e67e22',
+    expansions: [
+      { id: 'xy-ev',   nameIT: 'Evoluzioni',            nameEN: 'Evolutions',          date: '2016-11-02', artset: ['Raichu','Venusaur','Charizard','Blastoise'] },
+      { id: 'xy-va',   nameIT: 'Vapori Accesi',         nameEN: 'Steam Siege',         date: '2016-08-03', artset: ['Xerneas','Yveltal','Volcanion','Gardevoir'] },
+      { id: 'xy-di',   nameIT: 'Destini Incrociati',    nameEN: 'Fates Collide',       date: '2016-05-02', artset: ['Lugia','Delphox','Zygarde','Alakazam'] },
+      { id: 'xy-gen',  nameIT: 'Generazioni',           nameEN: 'Generations',         date: '2016-02-22', artset: ['Pikachu','Charizard','Blastoise','Venusaur'] },
+      { id: 'xy-tc',   nameIT: 'Turbocrash',            nameEN: 'BREAKpoint',          date: '2016-02-03', artset: ['Greninja','Luxray','Gyarados','Scizor'] },
+      { id: 'xy-tb',   nameIT: 'Turboblitz',            nameEN: 'BREAKthrough',        date: '2015-11-04', artset: ['Mewtwo (1)','Mewtwo (2)','Zoroark','Houndoom'] },
+      { id: 'xy-ao',   nameIT: 'Antiche Origini',       nameEN: 'Ancient Origins',     date: '2015-08-12', artset: ['Hoopa','Rayquaza','Groudon','Tyranitar'] },
+      { id: 'xy-fv',   nameIT: 'Furie Volanti',         nameEN: 'Roaring Skies',       date: '2015-05-06', artset: ['Gallade','Latios','Rayquaza','Deoxys'] },
+      { id: 'xy-dc',   nameIT: 'Double Crisis',         nameEN: 'Double Crisis',       date: '2015-03-25', artset: ['Kyogre (Team Idro)','Groudon (Team Magma)'] },
+      { id: 'xy-sp',   nameIT: 'Scontro Primordiale',   nameEN: 'Primal Clash',        date: '2015-02-04', artset: ['Groudon','Kyogre','Aggron','Gardevoir'] },
+      { id: 'xy-fs',   nameIT: 'Forze Spettrali',       nameEN: 'Phantom Forces',      date: '2014-11-05', artset: ['Gengar','Aegislash','Manectric','Diancie'] },
+      { id: 'xy-cof',  nameIT: 'Colpi Furiosi',         nameEN: 'Furious Fists',       date: '2014-08-13', artset: ['Tyrantrum','Lucario','Heracross','Hawlucha'] },
+      { id: 'xy-fi',   nameIT: 'Fuoco Infernale',       nameEN: 'Flashfire',           date: '2014-05-07', artset: ['Pyroar','Kangaskhan','Charizard (Mega X)','Charizard (Mega Y)'] },
+      { id: 'xy-base', nameIT: 'XY',                   nameEN: 'XY',                  date: '2014-02-05', artset: ['Yveltal','Xerneas','Blastoise','Venusaur'] },
+    ]
+  },
+  {
+    id: 'bw', labelIT: 'Nero e Bianco', labelEN: 'Black & White', color: '#95a5a6',
+    expansions: [
+      { id: 'bw-lt',   nameIT: 'Legendary Treasures',       nameEN: 'Legendary Treasures',   date: '2013-11-06', artset: ['Reshiram','Mewtwo','Zekrom','Genesect'] },
+      { id: 'bw-ep2',  nameIT: 'Esplosione Plasma',         nameEN: 'Plasma Blast',          date: '2013-08-14', artset: ['Porygon-Z','Genesect','Palkia','Dialga'] },
+      { id: 'bw-gp',   nameIT: 'Glaciazione Plasma',        nameEN: 'Plasma Freeze',         date: '2013-05-08', artset: ['Thundurus','Bisharp','Deoxys','Absol'] },
+      { id: 'bw-up2',  nameIT: 'Uragano Plasma',            nameEN: 'Plasma Storm',          date: '2013-02-06', artset: ['Liepard','Infernape','Articuno','Lugia'] },
+      { id: 'bw-cv',   nameIT: 'Confini Varcati',           nameEN: 'Boundaries Crossed',    date: '2012-11-07', artset: ['Keldeo','Kyurem Nero','Kyurem Bianco','Landorus'] },
+      { id: 'bw-sd',   nameIT: 'Stirpe dei Draghi',         nameEN: "Dragons Exalted",       date: '2012-08-15', artset: ['Dragonite','Rayquaza','Haxorus','Druddigon','Salamence'] },
+      { id: 'bw-td2',  nameIT: 'Tesoro dei Draghi',         nameEN: 'Dragon Vault',          date: '2012-10-01', artset: ['Terrakion','Rayquaza','Giratina','Gyarados'] },
+      { id: 'bw-edt',  nameIT: 'Esploratori delle Tenebre', nameEN: 'Dark Explorers',        date: '2012-05-09', artset: ['Scrafty','Excadrill','Darkrai','Venusaur'] },
+      { id: 'bw-df',   nameIT: 'Destini Futuri',            nameEN: 'Next Destinies',        date: '2012-02-08', artset: ['Zekrom','Reshiram','Mewtwo','Regigigas'] },
+      { id: 'bw-vr',   nameIT: 'Vittorie Regali',           nameEN: 'Noble Victories',       date: '2011-11-16', artset: ['Kyurem','Victini','Hydreigon','Druddigon'] },
+      { id: 'bw-nf',   nameIT: 'Nuove Forze',               nameEN: 'Emerging Powers',       date: '2011-08-31', artset: ['Tornadus','Cobalion','Darmanitan','Braviary'] },
+      { id: 'bw-base', nameIT: 'Nero e Bianco',             nameEN: 'Black & White',         date: '2011-04-25', artset: ['Zekrom','Zoroark','Reshiram','Zebstrika'] },
+    ]
+  },
+  {
+    id: 'hgss', labelIT: 'HeartGold & SoulSilver', labelEN: 'HeartGold & SoulSilver', color: '#f1c40f',
+    expansions: [
+      { id: 'hgss-cl',   nameIT: 'Richiamo delle Leggende', nameEN: 'Call of Legends',       date: '2011-02-09', artset: ['Groudon','Kyogre','Lugia','Deoxys'] },
+      { id: 'hgss-bt',   nameIT: 'Battaglie Trionfali',     nameEN: 'Triumphant',            date: '2010-11-03', artset: ['Magmortar','Electivire','Dialga','Palkia'] },
+      { id: 'hgss-sp',   nameIT: 'Senza Paura',             nameEN: 'Undaunted',             date: '2010-08-18', artset: ['Skarmory','Houndoom','Rayquaza','Jolteon'] },
+      { id: 'hgss-un',   nameIT: 'Forze Scatenate',         nameEN: 'Unleashed',             date: '2010-05-12', artset: ['Suicune','Entei','Raikou','Crobat'] },
+      { id: 'hgss-base', nameIT: 'HeartGold & SoulSilver',  nameEN: 'HeartGold & SoulSilver',date: '2010-02-10', artset: ['Ho-Oh','Donphan','Lugia','Ampharos'] },
+    ]
+  },
+  {
+    id: 'pt', labelIT: 'Serie Platino', labelEN: 'Platinum Series', color: '#8e44ad',
+    expansions: [
+      { id: 'pt-ar',   nameIT: 'Arceus',              nameEN: 'Arceus',            date: '2009-11-04', artset: ['Salamence','Arceus (Fuoco)','Arceus (Psico)','Zapdos'] },
+      { id: 'pt-sv',   nameIT: 'Supreme Victors',     nameEN: 'Supreme Victors',   date: '2009-08-19', artset: ['Garchomp','Rayquaza','Absol','Charizard'] },
+      { id: 'pt-rr',   nameIT: "L'Ascesa dei Rivali", nameEN: 'Rising Rivals',     date: '2009-05-16', artset: ['Houndoom','Gyarados','Blaziken','Shaymin'] },
+      { id: 'pt-base', nameIT: 'Platino',             nameEN: 'Platinum',          date: '2009-02-11', artset: ['Giratina','Leafeon','Garchomp','Zapdos'] },
+    ]
+  },
+  {
+    id: 'dp', labelIT: 'Diamante e Perla', labelEN: 'Diamond & Pearl', color: '#5b9bd5',
+    expansions: [
+      { id: 'dp-ft',   nameIT: 'Fronte di Tempesta',      nameEN: 'Stormfront',          date: '2008-11-05', artset: ['Da aggiungere'] },
+      { id: 'dp-irm',  nameIT: 'Il Risveglio dei Miti',   nameEN: 'Legends Awakened',    date: '2008-08-20', artset: ['Da aggiungere'] },
+      { id: 'dp-as',   nameIT: 'Alba Suprema',            nameEN: 'Majestic Dawn',       date: '2008-05-21', artset: ['Da aggiungere'] },
+      { id: 'dp-il',   nameIT: 'Incontri Leggendari',     nameEN: 'Great Encounters',    date: '2008-02-13', artset: ['Da aggiungere'] },
+      { id: 'dp-ps',   nameIT: 'Prodigi Segreti',         nameEN: 'Secret Wonders',      date: '2007-11-07', artset: ['Da aggiungere'] },
+      { id: 'dp-tm',   nameIT: 'Tesori Misteriosi',       nameEN: 'Mysterious Treasures', date: '2007-08-22', artset: ['Da aggiungere'] },
+      { id: 'dp-base', nameIT: 'Diamante e Perla',        nameEN: 'Diamond & Pearl',     date: '2007-05-23', artset: ['Da aggiungere'] },
+    ]
+  },
+  {
+    id: 'ex', labelIT: 'Serie EX', labelEN: 'EX Series', color: '#e74c3c',
+    expansions: [
+      { id: 'ex-pk',   nameIT: 'Power Keepers',           nameEN: 'Power Keepers',       date: '2007-02-14', artset: ['Da aggiungere'] },
+      { id: 'ex-id',   nameIT: "L'Isola dei Draghi",      nameEN: 'Dragon Frontiers',    date: '2006-11-08', artset: ['Da aggiungere'] },
+      { id: 'ex-gc',   nameIT: 'Guardiani dei Cristalli', nameEN: 'Crystal Guardians',   date: '2006-08-30', artset: ['Da aggiungere'] },
+      { id: 'ex-fh',   nameIT: 'Fantasmi di Holon',       nameEN: 'Holon Phantoms',      date: '2006-05-03', artset: ['Da aggiungere'] },
+      { id: 'ex-lm',   nameIT: 'La Leggenda di Mew',      nameEN: 'Legend Maker',        date: '2006-02-08', artset: ['Da aggiungere'] },
+      { id: 'ex-sd',   nameIT: 'Specie Delta',            nameEN: 'Delta Species',       date: '2005-10-31', artset: ['Da aggiungere'] },
+      { id: 'ex-fs',   nameIT: 'Forze Segrete',           nameEN: 'Unseen Forces',       date: '2005-08-22', artset: ['Da aggiungere'] },
+      { id: 'ex-sm',   nameIT: 'Smeraldo',                nameEN: 'Emerald',             date: '2005-05-09', artset: ['Da aggiungere'] },
+      { id: 'ex-deo',  nameIT: 'Deoxys',                  nameEN: 'Deoxys',              date: '2005-02-14', artset: ['Da aggiungere'] },
+      { id: 'ex-trr',  nameIT: 'Team Rocket Returns',     nameEN: 'Team Rocket Returns', date: '2004-11-01', artset: ['Da aggiungere'] },
+      { id: 'ex-rfvf', nameIT: 'Rosso Fuoco Verde Foglia',nameEN: 'FireRed & LeafGreen', date: '2004-08-30', artset: ['Da aggiungere'] },
+      { id: 'ex-ln',   nameIT: 'Leggende Nascoste',       nameEN: 'Hidden Legends',      date: '2004-06-14', artset: ['Da aggiungere'] },
+      { id: 'ex-tmti', nameIT: 'Team Magma vs Team Idro', nameEN: 'Team Magma vs Team Aqua', date: '2004-03-01', artset: ['Da aggiungere'] },
+      { id: 'ex-dr',   nameIT: 'Drago',                   nameEN: 'Dragon',              date: '2003-09-17', artset: ['Da aggiungere'] },
+      { id: 'ex-ts',   nameIT: 'Tempesta di Sabbia',      nameEN: 'Sandstorm',           date: '2003-09-17', artset: ['Da aggiungere'] },
+      { id: 'ex-rz',   nameIT: 'Rubino e Zaffiro',        nameEN: 'Ruby & Sapphire',     date: '2003-07-01', artset: ['Da aggiungere'] },
+    ]
+  },
+  {
+    id: 'ecard', labelIT: 'Serie e-Card', labelEN: 'e-Card Series', color: '#1abc9c',
+    expansions: [
+      { id: 'ec-sky', nameIT: 'Skyridge',   nameEN: 'Skyridge',   date: '2003-05-12', artset: ['Da aggiungere'] },
+      { id: 'ec-aq',  nameIT: 'Aquapolis',  nameEN: 'Aquapolis',  date: '2003-01-15', artset: ['Da aggiungere'] },
+      { id: 'ec-exp', nameIT: 'Expedition', nameEN: 'Expedition', date: '2002-09-15', artset: ['Da aggiungere'] },
+    ]
+  },
+  {
+    id: 'neo', labelIT: 'Serie Neo', labelEN: 'Neo Series', color: '#2ecc71',
+    expansions: [
+      { id: 'neo-leg', nameIT: 'Legendary Collection', nameEN: 'Legendary Collection', date: '2002-05-24', artset: ['Da aggiungere'] },
+      { id: 'neo-des', nameIT: 'Neo Destiny',          nameEN: 'Neo Destiny',          date: '2002-02-28', artset: ['Da aggiungere'] },
+      { id: 'neo-rev', nameIT: 'Neo Revelation',       nameEN: 'Neo Revelation',       date: '2001-09-21', artset: ['Da aggiungere'] },
+      { id: 'neo-dis', nameIT: 'Neo Discovery',        nameEN: 'Neo Discovery',        date: '2001-06-01', artset: ['Da aggiungere'] },
+      { id: 'neo-gen', nameIT: 'Neo Genesis',          nameEN: 'Neo Genesis',          date: '2000-12-16', artset: ['Da aggiungere'] },
+    ]
+  },
+  {
+    id: 'orig', labelIT: 'Serie Originale', labelEN: 'Original Series', color: '#f39c12',
+    expansions: [
+      { id: 'orig-gc',  nameIT: 'Gym Challenge', nameEN: 'Gym Challenge', date: '2000-10-16', artset: ['Da aggiungere'] },
+      { id: 'orig-gh',  nameIT: 'Gym Heroes',    nameEN: 'Gym Heroes',    date: '2000-08-14', artset: ['Da aggiungere'] },
+      { id: 'orig-tr',  nameIT: 'Team Rocket',   nameEN: 'Team Rocket',   date: '2000-04-24', artset: ['Da aggiungere'] },
+      { id: 'orig-sb2', nameIT: 'Set Base 2',    nameEN: 'Base Set 2',    date: '2000-02-24', artset: ['Da aggiungere'] },
+      { id: 'orig-fos', nameIT: 'Fossil',        nameEN: 'Fossil',        date: '1999-10-10', artset: ['Da aggiungere'] },
+      { id: 'orig-jun', nameIT: 'Jungle',        nameEN: 'Jungle',        date: '1999-06-16', artset: ['Da aggiungere'] },
+      { id: 'orig-sb',  nameIT: 'Set Base',      nameEN: 'Base Set',      date: '1999-01-09', artset: ['Da aggiungere'] },
+    ]
+  },
+];
+
+// ═══════════════════════════════════════════════════
+// LANG & STORAGE
+// ═══════════════════════════════════════════════════
+const KEY = 'pkm-artset-v3';
+const LANG_KEY = 'pkm-lang';
+let col = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } })();
+let lang = localStorage.getItem(LANG_KEY) || 'it';
+
+function save() { localStorage.setItem(KEY, JSON.stringify(col)); }
+function saveLang() { localStorage.setItem(LANG_KEY, lang); }
+
+function setLang(l) {
+  lang = l;
+  saveLang();
+  document.getElementById('btn-it').classList.toggle('active', l === 'it');
+  document.getElementById('btn-en').classList.toggle('active', l === 'en');
+  buildUI();
+}
+
+function getName(exp) { return lang === 'en' ? exp.nameEN : exp.nameIT; }
+function getSerieLabel(serie) { return lang === 'en' ? serie.labelEN : serie.labelIT; }
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString(lang === 'it' ? 'it-IT' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// ═══════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════
+let toastT;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function countOwned(expId) {
+  const o = col[expId] || {};
+  return Object.values(o).filter(Boolean).length;
+}
+
+function findExp(id) {
+  for (const s of SERIES) {
+    const e = s.expansions.find(e => e.id === id);
+    if (e) return { exp: e, serie: s };
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// TOGGLE
+// ═══════════════════════════════════════════════════
+function toggleBustina(expId, idx) {
+  if (!col[expId]) col[expId] = {};
+  col[expId][idx] = !col[expId][idx];
+  save();
+  refreshCard(expId);
+  updateStats();
+  const { exp, serie } = findExp(expId);
+  if (countOwned(expId) === exp.artset.length) toast('🎉 ' + getName(exp) + ' completato!');
+  refreshSerieBar(serie);
+}
+
+// ═══════════════════════════════════════════════════
+// REFRESH SINGLE CARD
+// ═══════════════════════════════════════════════════
+function refreshCard(expId) {
+  const card = document.getElementById('card-' + expId);
+  if (!card) return;
+  const { exp } = findExp(expId);
+  const owned = countOwned(expId);
+  const isComplete = owned >= exp.artset.length;
+  exp.artset.forEach((_, i) => {
+    const row = document.getElementById('row-' + expId + '-' + i);
+    if (row) row.classList.toggle('owned', !!(col[expId] && col[expId][i]));
+  });
+  const frac = card.querySelector('.artset-fraction');
+  frac.textContent = owned + '/' + exp.artset.length;
+  frac.classList.toggle('complete', isComplete);
+  card.classList.toggle('complete', isComplete);
+}
+
+// ═══════════════════════════════════════════════════
+// STATS & SERIE BAR
+// ═══════════════════════════════════════════════════
+function updateStats() {
+  let total = 0, owned = 0, complete = 0;
+  SERIES.forEach(s => s.expansions.forEach(exp => {
+    total += exp.artset.length;
+    const o = countOwned(exp.id);
+    owned += o;
+    if (o >= exp.artset.length) complete++;
+  }));
+  document.getElementById('stat-owned').textContent = owned;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-complete').textContent = complete;
+}
+
+function refreshSerieBar(serie) {
+  const tot = serie.expansions.reduce((s, e) => s + e.artset.length, 0);
+  const own = serie.expansions.reduce((s, e) => s + countOwned(e.id), 0);
+  const pct = tot ? Math.round(own / tot * 100) : 0;
+  const bar = document.getElementById('bar-' + serie.id);
+  const cnt = document.getElementById('cnt-' + serie.id);
+  if (bar) bar.style.width = pct + '%';
+  if (cnt) cnt.textContent = own + '/' + tot;
+}
+
+// ═══════════════════════════════════════════════════
+// BUILD UI
+// ═══════════════════════════════════════════════════
+function buildUI() {
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+
+  // Aggiorna bottoni lingua
+  document.getElementById('btn-it').classList.toggle('active', lang === 'it');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+
+  SERIES.forEach(serie => {
+    const tot = serie.expansions.reduce((s, e) => s + e.artset.length, 0);
+    const own = serie.expansions.reduce((s, e) => s + countOwned(e.id), 0);
+    const pct = tot ? Math.round(own / tot * 100) : 0;
+
+    const section = document.createElement('section');
+    section.className = 'serie-section';
+    section.id = 'serie-' + serie.id;
+    section.innerHTML = `
+      <div class="serie-header" onclick="toggleSerie('${serie.id}')">
+        <div class="serie-dot" style="background:${serie.color}"></div>
+        <div class="serie-title">${getSerieLabel(serie)}</div>
+        <div class="serie-progress-bar">
+          <div class="serie-progress-fill" id="bar-${serie.id}" style="width:${pct}%;background:${serie.color}"></div>
+        </div>
+        <div class="serie-count" id="cnt-${serie.id}">${own}/${tot}</div>
+        <div class="serie-toggle">▾</div>
+      </div>
+      <div class="expansions-grid" id="grid-${serie.id}"></div>
+    `;
+    app.appendChild(section);
+    const grid = section.querySelector('.expansions-grid');
+
+    serie.expansions.forEach(exp => {
+      const card = document.createElement('div');
+      const ownedCount = countOwned(exp.id);
+      const isComplete = ownedCount >= exp.artset.length;
+
+      card.className = 'exp-card' + (isComplete ? ' complete' : '');
+      card.id = 'card-' + exp.id;
+      card.style.setProperty('--card-color', serie.color);
+
+      const checkSvg = `<svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+      const rowsHtml = exp.artset.map((subj, i) => {
+        const isOwned = !!(col[exp.id] && col[exp.id][i]);
+        return `<div class="bustina-row${isOwned ? ' owned' : ''}" id="row-${exp.id}-${i}" onclick="toggleBustina('${exp.id}', ${i})">
+          <div class="bustina-check">${checkSvg}</div>
+          <div class="bustina-name">${subj}</div>
+        </div>`;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="exp-meta">
+          <div class="exp-date">${formatDate(exp.date)}</div>
+          <div class="complete-badge">${lang === 'it' ? 'COMPLETO' : 'COMPLETE'}</div>
+        </div>
+        <div class="exp-name">${getName(exp)}</div>
+        <div class="bustine-list">${rowsHtml}</div>
+        <div class="artset-fraction${isComplete ? ' complete' : ''}">${ownedCount}/${exp.artset.length}</div>
+      `;
+      grid.appendChild(card);
+    });
+
+    grid.style.maxHeight = grid.scrollHeight + 'px';
+  });
+
+  updateStats();
+}
+
+function toggleSerie(id) {
+  const section = document.getElementById('serie-' + id);
+  const grid = document.getElementById('grid-' + id);
+  const isCollapsed = section.classList.contains('collapsed');
+  if (isCollapsed) {
+    section.classList.remove('collapsed');
+    grid.style.maxHeight = grid.scrollHeight + 'px';
+  } else {
+    grid.style.maxHeight = grid.scrollHeight + 'px';
+    requestAnimationFrame(() => section.classList.add('collapsed'));
+  }
+}
+
+buildUI();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").then(r => console.log("SW registrato", r)).catch(e => console.error("SW errore", e));
+  });
+}
+</script>
+</body>
+</html>
